@@ -8,6 +8,8 @@ from cryptography.fernet import Fernet, InvalidToken
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
+__version__ = "0.1"
+
 
 class EncodeDataFunction(Protocol):
     """Encode a Python dict to bytes."""
