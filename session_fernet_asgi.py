@@ -12,7 +12,7 @@ from starlette.requests import Request
 # NOTE: remove once starlette supports samesite argument to Response.set_cookie
 http.cookies.Morsel._reserved["samesite"] = "SameSite"  # type: ignore  # pylint: disable=all
 
-__version__ = "0.1"
+__version__ = "0.2"
 
 
 class EncodeDataFunction(Protocol):
