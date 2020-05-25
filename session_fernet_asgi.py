@@ -4,9 +4,13 @@ from dataclasses import dataclass
 import json
 from typing import Protocol, Optional, Any
 
+import http.cookies
 from cryptography.fernet import Fernet, InvalidToken
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+
+# NOTE: remove once starlette supports samesite argument to Response.set_cookie
+http.cookies.Morsel._reserved["samesite"] = "SameSite"  # type: ignore  # pylint: disable=all
 
 __version__ = "0.1"
 
@@ -49,6 +53,46 @@ def _json_loads_bytes(data: bytes) -> dict:
     return json.loads(data.decode("utf-8"))
 
 
+#
+# NOTE: to be replaced once starlette supports samesite argument to Response.set_cookie
+#
+def _set_cookie(  # pylint: disable=too-many-arguments
+    response,
+    key: str,
+    value: str = "",
+    max_age: int = None,
+    expires: int = None,
+    path: str = "/",
+    domain: str = None,
+    secure: bool = False,
+    httponly: bool = False,
+    samesite: str = "lax",
+) -> None:
+    cookie = http.cookies.SimpleCookie()  # type: ignore
+    cookie[key] = value
+    if max_age is not None:
+        cookie[key]["max-age"] = max_age
+    if expires is not None:
+        cookie[key]["expires"] = expires
+    if path is not None:
+        cookie[key]["path"] = path
+    if domain is not None:
+        cookie[key]["domain"] = domain
+    if secure:
+        cookie[key]["secure"] = True
+    if httponly:
+        cookie[key]["httponly"] = True
+    if samesite is not None:
+        assert samesite.lower() in [
+            "strict",
+            "lax",
+            "none",
+        ], "samesite must be either 'strict', 'lax' or 'none'"
+        cookie[key]["samesite"] = samesite
+    cookie_val = cookie.output(header="").strip()
+    response.raw_headers.append((b"set-cookie", cookie_val.encode("latin-1")))
+
+
 class SessionMiddleware(BaseHTTPMiddleware):
     """The session middleware implementation.
 
@@ -75,7 +119,7 @@ class SessionMiddleware(BaseHTTPMiddleware):
         self.default_value = default_value or {}
         self.encode_data = encode_data
         self.decode_data = decode_data
-        self.fernet = Fernet(secret_key, fernet_backend)
+        self.fernet = Fernet(secret_key, fernet_backend)  # type: ignore
 
     def _load(self, request: Request) -> dict:
         try:
@@ -94,7 +138,9 @@ class SessionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         request.scope["session"] = self._load(request)
         response = await call_next(request)
-        response.set_cookie(
+        # NOTE: replace with Response.set_cookie once samesite argument is supported
+        _set_cookie(
+            response,
             self.cookie_config.name,
             self._dump(request.scope["session"]),
             max_age=self.cookie_config.max_age,
