@@ -67,7 +67,7 @@ def _set_cookie(  # pylint: disable=too-many-arguments
     secure: bool = False,
     httponly: bool = False,
     samesite: str = "lax",
-) -> None:
+) -> None:  # pragma: no cover
     cookie = http.cookies.SimpleCookie()  # type: ignore
     cookie[key] = value
     if max_age is not None:
